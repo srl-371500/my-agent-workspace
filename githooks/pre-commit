@@ -1,0 +1,11 @@
+#!/bin/sh
+# Pre-commit hook - shell wrapper
+# Calls the Python audit script via Windows Python Launcher (py.exe)
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PY_EXE="C:/windows/py.exe"
+
+"$PY_EXE" "$SCRIPT_DIR/pre-commit-audit.py"
+EXIT_CODE=$?
+
+exit $EXIT_CODE
