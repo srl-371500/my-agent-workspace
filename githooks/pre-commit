@@ -1,11 +1,25 @@
 #!/bin/sh
 # Pre-commit hook - shell wrapper
-# Calls the Python audit script via Windows Python Launcher (py.exe)
+# Dynamically detects Python from local .venv or system PATH
+# No C drive dependency - fully sandboxed in project directory
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PY_EXE="C:/windows/py.exe"
+HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$HOOK_DIR/.." && pwd)"
 
-"$PY_EXE" "$SCRIPT_DIR/pre-commit-audit.py"
+VENV_PYTHON="$PROJECT_ROOT/services/browser_distillation/.venv/Scripts/python.exe"
+
+if [ -f "$VENV_PYTHON" ]; then
+    PY_EXE="$VENV_PYTHON"
+elif command -v python > /dev/null 2>&1; then
+    PY_EXE="python"
+elif command -v python3 > /dev/null 2>&1; then
+    PY_EXE="python3"
+else
+    echo "ERROR: Python not found. Please ensure .venv exists or Python is in PATH."
+    exit 1
+fi
+
+"$PY_EXE" "$HOOK_DIR/pre-commit-audit.py"
 EXIT_CODE=$?
 
 exit $EXIT_CODE

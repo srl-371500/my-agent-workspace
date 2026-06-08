@@ -1,7 +1,7 @@
 # 项目记忆库 (MEMORY.md)
 
-> **最后更新时间**: 2026-06-08 16:30 (Asia/Shanghai)
-> **当前状态**: 任务三第一阶段完成，报告已生成
+> **最后更新时间**: 2026-06-08 17:20 (Asia/Shanghai)
+> **当前状态**: 任务二（自动化 Hook）已完成，pre-commit 审计钩子已落地
 
 ---
 
@@ -27,6 +27,7 @@
 | Cron 自动化环境搭建 | browser_distillation 项目初始化 | ✅ 已完成 |
 | API 连通性测试 | MiMo-V2.5 + browser-use 验证 | ✅ 已完成 |
 | 作品集分析 | analyze_portfolio.py 执行 | ✅ 已完成 |
+| 自动化 Hook | Git pre-commit 审计钩子 | ✅ 已完成 |
 
 ---
 
@@ -48,6 +49,10 @@
 - [x] API 连通性测试成功 (2026-06-08 16:10)
 - [x] 运行 `analyze_portfolio.py` 生成报告 (2026-06-08 16:25)
 - [x] 创建 `run_distillation.bat` 一键启动脚本 (2026-06-08 16:28)
+- [x] 配置 Git 本地钩子路径 `core.hooksPath` (2026-06-08 17:00)
+- [x] 编写 `pre-commit` 审计钩子 (2026-06-08 17:10)
+- [x] 编写 `pre-commit-audit.py` 审计脚本 (2026-06-08 17:10)
+- [x] 钩子测试通过 - API Key 拦截成功 (2026-06-08 17:15)
 
 ### 进行中任务
 *暂无*
@@ -56,7 +61,6 @@
 - [ ] 优化 browser-use 与 mimo-v2.5 的 JSON 格式兼容性
 - [ ] 配置定时任务 (Windows 任务计划程序)
 - [ ] 添加错误处理和日志记录
-- [ ] 开始【任务二：自动化 Hook】建设
 
 ---
 
@@ -66,12 +70,14 @@
 - browser-use 扩展下载失败会导致浏览器启动超时
 - mimo-v2.5 返回的 JSON 格式不完全符合 browser-use 的预期
 - 需要使用 `uv run` 命令运行脚本，否则会找不到模块
+- Git 钩子环境中 `python` 命令不可用（Windows App Execution Aliases 拦截）
 
 ### 解决方案记录
 - 设置环境变量 `BROWSER_USE_DISABLE_EXTENSIONS=true` 禁用扩展下载
 - 使用 `uv run python analyze_portfolio.py` 运行脚本
 - 确保在 `config/settings.yaml` 中配置正确的 API 密钥
 - 使用 browser-use 自己的 `ChatOpenAI` 而不是 langchain 的
+- Git 钩子使用完整路径 `C:/windows/py.exe` 调用 Python
 
 ### 环境注意事项
 - 操作系统: Windows
@@ -84,16 +90,17 @@
 - **运行命令**: `cd services/browser_distillation && uv run python analyze_portfolio.py`
 - **环境变量**: `BROWSER_USE_DISABLE_EXTENSIONS=true`
 - **一键启动**: 双击 `services/browser_distillation/run_distillation.bat`
+- **Git hooksPath**: `git config core.hooksPath githooks`
+- **Python 路径**: `C:/windows/py.exe` (Git 钩子环境)
 
 ---
 
 ## 🚀 下一步接力计划 (Next Steps)
 
 ### 立即执行 (High Priority)
-1. **开始【任务二：自动化 Hook】建设**
-   - 设计 Git Hook 自动化流程
-   - 实现代码提交时自动触发分析
-   - 配置 githooks 目录
+1. **配置 Windows 定时任务**
+   - 使用任务计划程序配置定时运行 analyze_portfolio.py
+   - 设置日志轮转和清理
 
 ### 短期计划 (Medium Priority)
 2. **优化 browser-use 兼容性**
@@ -101,9 +108,10 @@
    - 考虑添加 fallback_llm 配置
    - 优化错误处理和重试机制
 
-3. **配置 Windows 定时任务**
-   - 使用任务计划程序配置定时运行
-   - 设置日志轮转和清理
+3. **增强 pre-commit 钩子**
+   - 添加更多敏感信息检测模式
+   - 支持 .env 文件检查
+   - 添加代码质量检查 (ruff/flake8)
 
 ### 长期规划 (Low Priority)
 4. **扩展功能**
@@ -244,6 +252,56 @@ This website (example.com) is a reserved domain used for documentation and illus
 - [ ] 优化 browser-use 与 mimo-v2.5 的 JSON 格式兼容性
 - [ ] 开始【任务二：自动化 Hook】建设
 - [ ] 配置 Windows 定时任务
+
+### 2026-06-08 17:00 - 任务二：自动化 Hook 建设
+**执行内容**:
+- 创建 `githooks/` 目录
+- 配置 Git 本地钩子路径: `git config core.hooksPath githooks`
+- 编写 `githooks/pre-commit` shell 包装脚本
+- 编写 `githooks/pre-commit-audit.py` Python 审计脚本
+  - 检测 `config/settings.yaml` 中的真实 API Key
+  - 对暂存区的 `.py` 文件进行语法检查
+- 设置可执行权限: `git update-index --chmod=+x githooks/pre-commit`
+
+**结果**: 测试通过
+
+**测试输出**:
+```
+==================================================
+Pre-commit Audit Hook
+==================================================
+Staged files: 4
+  - MEMORY.md
+  - config/settings.yaml
+  - githooks/pre-commit
+  - githooks/pre-commit-audit.py
+
+[1/2] Checking for sensitive information...
+  ! config/settings.yaml is staged. Scanning for API keys...
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  SECURITY ALERT: REAL API KEY DETECTED!
+  File: config/settings.yaml
+  Key preview: tp-sfi4vka...
+  DO NOT commit this file with real API keys!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+[2/2] Checking Python syntax...
+  Checking 1 Python file(s)...
+  OK: githooks/pre-commit-audit.py
+
+Pre-commit audit FAILED! Commit blocked.
+```
+
+**踩坑记录**:
+- Git 钩子环境中 `python` 命令不可用（Windows App Execution Aliases 拦截）
+- 解决方案: 使用完整路径 `C:/windows/py.exe` 调用 Python
+- 采用 shell 包装脚本 + Python 审计脚本的双层架构
+
+**下一步行动**:
+- [ ] 配置 Windows 定时任务
+- [ ] 优化 browser-use 与 mimo-v2.5 的 JSON 格式兼容性
+- [ ] 增强 pre-commit 钩子功能
 
 ---
 

@@ -11,6 +11,8 @@ import os
 import re
 import tempfile
 
+PYTHON_EXE = sys.executable
+
 
 def run_command(cmd):
     try:
@@ -110,7 +112,7 @@ def check_python_syntax():
             with os.fdopen(fd, 'w', encoding='utf-8') as f:
                 f.write(stdout)
             
-            _, compile_err, compile_rc = run_command(f'py -m py_compile "{temp_file}"')
+            _, compile_err, compile_rc = run_command(f'"{PYTHON_EXE}" -m py_compile "{temp_file}"')
             if compile_rc == 0:
                 print(f"  OK: {py_file}")
             else:
