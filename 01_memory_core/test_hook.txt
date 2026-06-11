@@ -1,3 +1,0 @@
-This is a temporary file for testing the git hook defender.
-No credentials here.# 安全拦截测试：假 API 密钥
-OPENAI_API_KEY="sk-proj-AbCdEfGhIjKlMnOpQrStUvWxYz12345678"

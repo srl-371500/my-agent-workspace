@@ -40,18 +40,14 @@ def check_api_key():
     
     staged_files = get_staged_files()
     
-    if "config/settings.yaml" not in staged_files:
-        print("  - config/settings.yaml not staged. Skipping key check.")
+    sensitive_files = ["config/settings.yaml", ".env"]
+    staged_sensitive = [f for f in sensitive_files if f in staged_files]
+    
+    if not staged_sensitive:
+        print("  - No sensitive files staged. Skipping key check.")
         return True
     
-    print("  ! config/settings.yaml is staged. Scanning for API keys...")
-    
-    stdout, stderr, rc = run_command("git show :config/settings.yaml")
-    if rc != 0:
-        print(f"  X Error reading staged settings.yaml: {stderr}")
-        return False
-    
-    content = stdout
+    print(f"  ! Sensitive files staged: {', '.join(staged_sensitive)}")
     
     placeholder_patterns = [
         "your_api_key_here",
@@ -59,28 +55,46 @@ def check_api_key():
         "REPLACE_WITH_YOUR_KEY",
         "sk-xxxxxxxx",
         "YOUR_API_KEY",
+        "your-api-key-here",
     ]
     
-    for pattern in placeholder_patterns:
-        if pattern in content:
-            print("  OK: API key appears to be a placeholder.")
-            return True
-    
-    api_key_match = re.search(r'api_key:\s*["\']?([^"\'\n]+)["\']?', content)
-    if api_key_match:
-        api_key_value = api_key_match.group(1).strip()
+    for file in staged_sensitive:
+        print(f"  Scanning {file} for API keys...")
         
-        if len(api_key_value) > 10 and re.search(r'[a-zA-Z0-9]{10,}', api_key_value):
-            print()
-            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-            print("  SECURITY ALERT: REAL API KEY DETECTED!")
-            print("  File: config/settings.yaml")
-            print(f"  Key preview: {api_key_value[:10]}...")
-            print("  DO NOT commit this file with real API keys!")
-            print("  Use a placeholder value instead.")
-            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-            print()
+        stdout, stderr, rc = run_command(f"git show :{file}")
+        if rc != 0:
+            print(f"  X Error reading staged {file}: {stderr}")
             return False
+        
+        content = stdout
+        
+        for pattern in placeholder_patterns:
+            if pattern in content:
+                print(f"  OK: {file} appears to contain placeholder values.")
+                break
+        else:
+            api_key_patterns = [
+                r'api_key:\s*["\']?([^"\'\n]+)["\']?',
+                r'LLM_API_KEY=["\']?([^"\'\n]+)["\']?',
+                r'api[_-]?key["\']?\s*[:=]\s*["\']?([^"\'\n]+)["\']?',
+            ]
+            
+            for pattern in api_key_patterns:
+                match = re.search(pattern, content)
+                if match:
+                    api_key_value = match.group(1).strip()
+                    
+                    if len(api_key_value) > 10 and re.search(r'[a-zA-Z0-9]{10,}', api_key_value):
+                        print()
+                        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+                        print("  SECURITY ALERT: REAL API KEY DETECTED!")
+                        print(f"  File: {file}")
+                        print(f"  Key preview: {api_key_value[:10]}...")
+                        print("  DO NOT commit this file with real API keys!")
+                        print("  Use .env.example as a template.")
+                        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+                        print()
+                        return False
     
     print("  OK: No obvious API key patterns found.")
     return True

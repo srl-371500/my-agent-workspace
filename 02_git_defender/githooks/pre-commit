@@ -1,0 +1,23 @@
+#!/bin/sh
+# Pre-commit hook - shell wrapper
+# Uses workspace root .venv for isolated Python execution
+# No C drive dependency - fully sandboxed in project directory
+
+HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$HOOK_DIR/../.." && pwd)"
+
+VENV_PYTHON="$PROJECT_ROOT/.venv/Scripts/python.exe"
+
+if [ -f "$VENV_PYTHON" ]; then
+    PY_EXE="$VENV_PYTHON"
+    echo "[INFO] Using workspace .venv: $VENV_PYTHON"
+else
+    echo "ERROR: Virtual environment not found at $VENV_PYTHON"
+    echo "Please run setup.ps1 first to create the virtual environment."
+    exit 1
+fi
+
+"$PY_EXE" "$HOOK_DIR/pre-commit-audit.py"
+EXIT_CODE=$?
+
+exit $EXIT_CODE

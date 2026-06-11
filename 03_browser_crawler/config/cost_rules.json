@@ -1,0 +1,19 @@
+{
+  "models": {
+    "mimo-v2.5": {
+      "provider": "xiaomi",
+      "pricing": {
+        "prompt_tokens_per_million_cny": 2.0,
+        "completion_tokens_per_million_cny": 8.0,
+        "prompt_tokens_per_million_usd": 0.28,
+        "completion_tokens_per_million_usd": 1.12
+      },
+      "currency_primary": "CNY",
+      "currency_secondary": "USD",
+      "exchange_rate_usd_cny": 7.15
+    }
+  },
+  "default_model": "mimo-v2.5",
+  "audit_log_path": "logs/cost_audit.json",
+  "budget_alert_threshold_cny": 10.0
+}
