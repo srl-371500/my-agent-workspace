@@ -22,14 +22,12 @@
 
 ```
 my-agent-workspace/
-├── 01_AI长期记忆内核/          # 记忆系统
+├── 01_memory_core/              # 记忆系统
 │   ├── SPEC.md                 # 项目宪法（静态）
-│   ├── CHRONICLE.md            # 滚动日志（动态）
 │   └── .trae/rules/            # AI 行为约束规则
-├── 02_Git提交防泄密拦截器/      # 安全系统
+├── 02_git_defender/             # 安全系统
 │   └── githooks/               # Git 钩子
-├── 03_多模态爬虫与数据蒸馏系统/  # 爬虫系统
-│   └── services/browser_distillation/
+├── 03_browser_crawler/          # 爬虫系统
 ├── .env.example                # 环境变量模板
 ├── .gitignore                  # Git 忽略规则
 ├── setup.ps1                   # 一键部署脚本
@@ -116,12 +114,7 @@ cp .env.example .env
 
 ---
 
-*本文档由 AI 自动维护，最后更新：2026-06-10*
-
 ## Historical Milestones
 
-
-### Archived on 2026-06-10
-- **Unknown**: Task #1 (Done)
-- **Unknown**: Task #2 (Done)
-- **Unknown**: Task #3 (Done)
+### 2026-06-12: Chronicle Auto-Archive
+- 初始化项目结构、配置 Git 钩子、安装 Playwright 浏览器、测试 API 连通性、编写数据蒸馏脚本、部署自动化定时任务。

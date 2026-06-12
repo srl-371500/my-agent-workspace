@@ -1,8 +1,0 @@
-api:
-  endpoint: "https://token-plan-sgp.xiaomimimo.com/v1"
-  api_key: ""  # 留空，仅供 pre-commit 脚本校验使用
-  model: "mimo-v2.5"
-
-browser:
-  headless: true
-  timeout: 30000
