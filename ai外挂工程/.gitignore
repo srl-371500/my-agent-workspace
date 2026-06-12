@@ -32,6 +32,7 @@ config/settings.yaml
 # IDE
 .vscode/
 .idea/
+.cursorrules
 *.swp
 *.swo
 *~

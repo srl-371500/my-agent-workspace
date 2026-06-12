@@ -7,18 +7,33 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+function Find-ProjectRoot {
+    param([string]$StartDir)
+    $markers = @(".git", "package.json", ".trae", ".vscode")
+    $current = (Resolve-Path $StartDir).Path
+    while ($true) {
+        foreach ($m in $markers) {
+            if (Test-Path (Join-Path $current $m)) {
+                return $current
+            }
+        }
+        $parent = Split-Path $current -Parent
+        if (-not $parent -or $parent -eq $current) {
+            return $current
+        }
+        $current = $parent
+    }
+}
+
 $ToolkitRoot = $PSScriptRoot
-$ParentDir = Split-Path $PSScriptRoot -Parent
+$WorkspaceRoot = Find-ProjectRoot (Split-Path $ToolkitRoot -Parent)
 
-$hasToolkitModules = (Test-Path "$ToolkitRoot/01_memory_core") -and (Test-Path "$ToolkitRoot/02_git_defender")
-$parentIsDifferent = ($ParentDir -ne $ToolkitRoot)
-
-if ($hasToolkitModules -and $parentIsDifferent) {
-    $WorkspaceRoot = $ParentDir
-    Write-Host "[MODE] Subfolder toolkit detected." -ForegroundColor Yellow
-} else {
-    $WorkspaceRoot = $ToolkitRoot
+if ($WorkspaceRoot -eq $ToolkitRoot) {
     Write-Host "[MODE] Standalone workspace mode." -ForegroundColor Yellow
+    $WorkspaceRoot = $ToolkitRoot
+} else {
+    Write-Host "[MODE] Subfolder toolkit detected. Host root: $WorkspaceRoot" -ForegroundColor Yellow
 }
 
 $ToolkitName = Split-Path $ToolkitRoot -Leaf
@@ -45,41 +60,82 @@ if ($Sync) {
         Write-Host "[SUCCESS] githooks/ synced." -ForegroundColor Green
     }
 
-    Write-Host "`n[2/2] Syncing services/ latest fixes..." -ForegroundColor Cyan
-    if (Test-Path "$CorePath/services") {
-        Copy-Item -Path "$CorePath/services/*" -Destination "$ToolkitRoot/03_browser_crawler/services/" -Recurse -Force
-        Write-Host "[SUCCESS] services/ synced." -ForegroundColor Green
-    }
-
     Write-Host "`n[SUCCESS] Golden base sync completed!" -ForegroundColor Green
     exit 0
 }
 
-Write-Host "[1/6] Verifying 01_memory_core..." -ForegroundColor Cyan
-if (Test-Path "$ToolkitRoot/01_memory_core") {
-    $rulesSource = "$ToolkitRoot/01_memory_core/.trae/rules"
-    if (Test-Path $rulesSource) {
-        if (-not (Test-Path "$WorkspaceRoot/.trae/rules")) {
-            New-Item -ItemType Directory -Force -Path "$WorkspaceRoot/.trae/rules" | Out-Null
-        }
-        Copy-Item -Path "$rulesSource/*" -Destination "$WorkspaceRoot/.trae/rules/" -Recurse -Force
-        Write-Host "[SUCCESS] Trae native rules loaded." -ForegroundColor Green
+Write-Host "[1/5] Meta-Rule Adaptive Injector..." -ForegroundColor Cyan
+$rulesSource = "$ToolkitRoot/01_memory_core/.trae/rules"
+if (-not (Test-Path $rulesSource)) { Write-Host "  [WARN] No rules source." -ForegroundColor Yellow }
+else {
+    $combined = @(); foreach ($f in Get-ChildItem "$rulesSource/*.md") { $combined += (Get-Content $f.FullName -Raw -Encoding UTF8) }
+    $merged = $combined -join "`n`n---`n`n"
+
+    $archCmd = "python ai外挂工程/01_memory_core/archive_chronicle.py"
+    $toolkitName = Split-Path $ToolkitRoot -Leaf
+    $claudeContent = @"
+# Project Rules — Agent Sandbox Toolkit
+
+## Development
+- Toolkit: $toolkitName/
+- Memory Core: $toolkitName/01_memory_core/
+- Git Defender: $toolkitName/02_git_defender/githooks/
+
+## Testing
+- ``python -m py_compile $toolkitName/01_memory_core/utils.py``
+- ``python -m py_compile $toolkitName/01_memory_core/archive_chronicle.py``
+- ``python -m py_compile $toolkitName/02_git_defender/githooks/pre-commit-audit.py``
+
+## Memory Management
+- MEMORY.md is the active log. When entries > 5, run:
+  ``$archCmd``
+- LLM summarization requires .env with LLM_API_KEY configured.
+"@
+
+    $ruleMatrix = @(
+        @{ Name="Trae";    Type="file"; Target="$WorkspaceRoot/.trae/rules/memory-agent.md"; Content=$merged },
+        @{ Name="VS Code"; Type="file"; Target="$WorkspaceRoot/.vscode/copilot-instructions.md"; Content=$merged },
+        @{ Name="Cursor";  Type="file"; Target="$WorkspaceRoot/.cursorrules"; Content=$merged },
+        @{ Name="Claude";  Type="file"; Target="$WorkspaceRoot/CLAUDE.md"; Content=$claudeContent }
+    )
+
+    $deployed = @()
+    foreach ($r in $ruleMatrix) {
+        $dir = Split-Path $r.Target -Parent
+        if ($dir -and -not (Test-Path $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
+        Set-Content -Path $r.Target -Value $r.Content -Encoding UTF8
+        $deployed += "  [OK] $($r.Name): $(Split-Path $r.Target -Leaf)"
     }
 
-    if (-not (Test-Path "$WorkspaceRoot/MEMORY.md")) {
-        if (Test-Path "$ToolkitRoot/01_memory_core/MEMORY_TEMPLATE.md") {
-            Copy-Item -Path "$ToolkitRoot/01_memory_core/MEMORY_TEMPLATE.md" -Destination "$WorkspaceRoot/MEMORY.md" -Force
-            Write-Host "[SUCCESS] Memory template generated as MEMORY.md." -ForegroundColor Green
-        } else {
-            New-Item -Path "$WorkspaceRoot/MEMORY.md" -ItemType File | Out-Null
-            Write-Host "[SUCCESS] Empty MEMORY.md created." -ForegroundColor Green
+    $futureTargets = @()
+    Get-ChildItem $WorkspaceRoot -Force -ErrorAction SilentlyContinue | ForEach-Object {
+        $name = $_.Name.ToLower()
+        if ($name -match 'claude|cursor|vscode|copilot|agent|codex') {
+            if ($_.PSIsContainer) {
+                $cfg = Get-ChildItem $_.FullName -File -Recurse -Depth 1 -ErrorAction SilentlyContinue |
+                    Where-Object { $_.Name -match '\.(md|txt|rules|json)$' -and $_.Length -lt 512000 }
+                foreach ($c in $cfg) { $futureTargets += $c.FullName }
+            } elseif ($_.Name -match '\.(md|txt|rules)$') {
+                $futureTargets += $_.FullName
+            }
         }
-    } else {
-        Write-Host "[INFO] MEMORY.md already exists, skipping." -ForegroundColor Gray
     }
+    foreach ($ft in $futureTargets) {
+        $existing = Get-Content $ft -Raw -Encoding UTF8 -ErrorAction SilentlyContinue
+        if ($existing -and $existing -notmatch "Agent Sandbox Toolkit") {
+            Add-Content -Path $ft -Value "`n`n---`n`n$merged" -Encoding UTF8
+            $deployed += "  [INJECT] $(Split-Path $ft -Leaf)"
+        }
+    }
+    $deployed | ForEach-Object { Write-Host $_ -ForegroundColor Green }
 }
 
-Write-Host "`n[2/6] Verifying 02_git_defender..." -ForegroundColor Cyan
+if (-not (Test-Path "$WorkspaceRoot/MEMORY.md")) {
+    New-Item -Path "$WorkspaceRoot/MEMORY.md" -ItemType File -Force | Out-Null
+    Write-Host "  [OK] MEMORY.md" -ForegroundColor Green
+}
+
+Write-Host "`n[2/5] Verifying 02_git_defender..." -ForegroundColor Cyan
 if (Test-Path "$ToolkitRoot/02_git_defender") {
     Write-Host "[SUCCESS] 02_git_defender module verified." -ForegroundColor Green
 
@@ -102,28 +158,27 @@ if (Test-Path "$ToolkitRoot/02_git_defender") {
     Write-Host "[SUCCESS] Git hooks bound to $hooksPath." -ForegroundColor Green
 }
 
-Write-Host "`n[3/6] Verifying 03_browser_crawler..." -ForegroundColor Cyan
-if (Test-Path "$ToolkitRoot/03_browser_crawler") {
-    Write-Host "[SUCCESS] 03_browser_crawler module verified." -ForegroundColor Green
-}
-
-Write-Host "`n[4/6] Creating .env configuration..." -ForegroundColor Cyan
+Write-Host "`n[3/5] Creating .env configuration..." -ForegroundColor Cyan
+$absBrowsersPath = "$ToolkitRoot/.playwright-browsers"
+$absPipCachePath = "$ToolkitRoot/.pip-cache"
 if (-not (Test-Path "$WorkspaceRoot/.env")) {
     $envExamplePath = "$ToolkitRoot/.env.example"
     if (Test-Path $envExamplePath) {
-        $envContent = Get-Content $envExamplePath -Raw -Encoding UTF8
-        $existingBrowserPath = "$ToolkitRoot/.playwright-browsers"
-        if (Test-Path $existingBrowserPath) {
-            $envContent = $envContent -replace 'PLAYWRIGHT_BROWSERS_PATH="[^"]*"', "PLAYWRIGHT_BROWSERS_PATH=`"$existingBrowserPath`""
-        }
-        Set-Content -Path "$WorkspaceRoot/.env" -Value $envContent -Encoding UTF8
-        Write-Host "[SUCCESS] .env created at workspace root." -ForegroundColor Green
+        Copy-Item -Path $envExamplePath -Destination "$WorkspaceRoot/.env" -Force
+        Write-Host "[SUCCESS] .env created from template at $WorkspaceRoot\.env" -ForegroundColor Green
     }
+}
+if (Test-Path "$WorkspaceRoot/.env") {
+    $envContent = Get-Content "$WorkspaceRoot/.env" -Raw -Encoding UTF8
+    $envContent = $envContent -replace '(?m)^PLAYWRIGHT_BROWSERS_PATH=.*$', "PLAYWRIGHT_BROWSERS_PATH=`"$absBrowsersPath`""
+    $envContent = $envContent -replace '(?m)^PIP_CACHE_DIR=.*$', "PIP_CACHE_DIR=`"$absPipCachePath`""
+    Set-Content -Path "$WorkspaceRoot/.env" -Value $envContent -Encoding UTF8 -NoNewline
+    Write-Host "[SUCCESS] .env paths normalized to absolute." -ForegroundColor Green
 } else {
-    Write-Host "[INFO] .env already exists, skipping." -ForegroundColor Gray
+    Write-Host "[WARN] .env not found, skipping path normalization." -ForegroundColor Yellow
 }
 
-Write-Host "`n[5/6] Setting up Python virtual environment..." -ForegroundColor Cyan
+Write-Host "`n[4/5] Setting up Python virtual environment..." -ForegroundColor Cyan
 $venvPath = "$WorkspaceRoot/.venv"
 $requirementsPath = "$WorkspaceRoot/requirements.txt"
 
@@ -157,7 +212,7 @@ $pythonExe = "$venvPath/Scripts/python.exe"
 & $pythonExe -m pip install -i https://pypi.tuna.tsinghua.edu.cn/simple --trusted-host pypi.tuna.tsinghua.edu.cn --timeout 60 -r $requirementsPath --quiet 2>&1 | Out-Null
 Write-Host "[SUCCESS] Python dependencies configured." -ForegroundColor Green
 
-Write-Host "`n[6/6] Verifying Playwright browsers..." -ForegroundColor Cyan
+Write-Host "`n[5/5] Verifying Playwright browsers..." -ForegroundColor Cyan
 $browsersPath = "$ToolkitRoot/.playwright-browsers"
 $env:PLAYWRIGHT_BROWSERS_PATH = $browsersPath
 

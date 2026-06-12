@@ -1,12 +1,21 @@
 #!/bin/sh
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-PROJECT_ROOT="$(cd "$HOOK_DIR/../../.." && pwd)"
-VENV_PYTHON="$PROJECT_ROOT/.venv/Scripts/python.exe"
-
-if [ ! -f "$VENV_PYTHON" ]; then
-    PROJECT_ROOT="$(cd "$HOOK_DIR/../.." && pwd)"
+PROJECT_ROOT="$HOOK_DIR"
+while [ "$PROJECT_ROOT" != "/" ]; do
     VENV_PYTHON="$PROJECT_ROOT/.venv/Scripts/python.exe"
+    if [ -f "$VENV_PYTHON" ]; then
+        break
+    fi
+    VENV_PYTHON="$PROJECT_ROOT/.venv/bin/python"
+    if [ -f "$VENV_PYTHON" ]; then
+        break
+    fi
+    PROJECT_ROOT="$(dirname "$PROJECT_ROOT")"
+done
+VENV_PYTHON="$PROJECT_ROOT/.venv/Scripts/python.exe"
+if [ ! -f "$VENV_PYTHON" ]; then
+    VENV_PYTHON="$PROJECT_ROOT/.venv/bin/python"
 fi
 
 if [ -f "$VENV_PYTHON" ]; then
