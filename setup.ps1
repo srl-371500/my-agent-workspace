@@ -1,5 +1,5 @@
 # setup.ps1 - Agent Sandbox Workspace Setup and Deployment Script
-# Subfolder Mode: Deploys to parent directory when running from toolkit subfolder
+# Standardized directory structure: src/, docs/, tests/
 
 param(
     [switch]$Sync,
@@ -8,40 +8,12 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-function Find-ProjectRoot {
-    param([string]$StartDir)
-    $markers = @(".git", "package.json", ".trae", ".vscode")
-    $current = (Resolve-Path $StartDir).Path
-    while ($true) {
-        foreach ($m in $markers) {
-            if (Test-Path (Join-Path $current $m)) {
-                return $current
-            }
-        }
-        $parent = Split-Path $current -Parent
-        if (-not $parent -or $parent -eq $current) {
-            return $current
-        }
-        $current = $parent
-    }
-}
-
 $ToolkitRoot = $PSScriptRoot
-$WorkspaceRoot = Find-ProjectRoot (Split-Path $ToolkitRoot -Parent)
-
-if ($WorkspaceRoot -eq $ToolkitRoot) {
-    Write-Host "[MODE] Standalone workspace mode." -ForegroundColor Yellow
-    $WorkspaceRoot = $ToolkitRoot
-} else {
-    Write-Host "[MODE] Subfolder toolkit detected. Host root: $WorkspaceRoot" -ForegroundColor Yellow
-}
-
-$ToolkitName = Split-Path $ToolkitRoot -Leaf
+$WorkspaceRoot = $ToolkitRoot
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "Agent Sandbox Workspace Setup" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "Toolkit Root:   $ToolkitRoot" -ForegroundColor Gray
 Write-Host "Workspace Root: $WorkspaceRoot" -ForegroundColor Gray
 Write-Host ""
 
@@ -56,7 +28,7 @@ if ($Sync) {
 
     Write-Host "`n[1/2] Syncing githooks/ latest fixes..." -ForegroundColor Cyan
     if (Test-Path "$CorePath/githooks") {
-        Copy-Item -Path "$CorePath/githooks/*" -Destination "$ToolkitRoot/02_git_defender/githooks/" -Recurse -Force
+        Copy-Item -Path "$CorePath/githooks/*" -Destination "$WorkspaceRoot/src/02_git_defender/githooks/" -Recurse -Force
         Write-Host "[SUCCESS] githooks/ synced." -ForegroundColor Green
     }
 
@@ -65,26 +37,25 @@ if ($Sync) {
 }
 
 Write-Host "[1/5] Meta-Rule Adaptive Injector..." -ForegroundColor Cyan
-$rulesSource = "$ToolkitRoot/01_memory_core/.trae/rules"
+$rulesSource = "$WorkspaceRoot/src/01_memory_core/.trae/rules"
 if (-not (Test-Path $rulesSource)) { Write-Host "  [WARN] No rules source." -ForegroundColor Yellow }
 else {
     $combined = @(); foreach ($f in Get-ChildItem "$rulesSource/*.md") { $combined += (Get-Content $f.FullName -Raw -Encoding UTF8) }
     $merged = $combined -join "`n`n---`n`n"
 
-    $archCmd = "python ai外挂工程/01_memory_core/archive_chronicle.py"
-    $toolkitName = Split-Path $ToolkitRoot -Leaf
+    $archCmd = "python src/01_memory_core/archive_chronicle.py"
     $claudeContent = @"
 # Project Rules — Agent Sandbox Toolkit
 
 ## Development
-- Toolkit: $toolkitName/
-- Memory Core: $toolkitName/01_memory_core/
-- Git Defender: $toolkitName/02_git_defender/githooks/
+- Source: src/
+- Memory Core: src/01_memory_core/
+- Git Defender: src/02_git_defender/githooks/
 
 ## Testing
-- ``python -m py_compile $toolkitName/01_memory_core/utils.py``
-- ``python -m py_compile $toolkitName/01_memory_core/archive_chronicle.py``
-- ``python -m py_compile $toolkitName/02_git_defender/githooks/pre-commit-audit.py``
+- ``python -m py_compile src/01_memory_core/utils.py``
+- ``python -m py_compile src/01_memory_core/archive_chronicle.py``
+- ``python -m py_compile src/02_git_defender/githooks/pre-commit-audit.py``
 
 ## Memory Management
 - MEMORY.md is the active log. When entries > 5, run:
@@ -130,19 +101,14 @@ else {
     $deployed | ForEach-Object { Write-Host $_ -ForegroundColor Green }
 }
 
-if (-not (Test-Path "$WorkspaceRoot/MEMORY.md")) {
-    New-Item -Path "$WorkspaceRoot/MEMORY.md" -ItemType File -Force | Out-Null
-    Write-Host "  [OK] MEMORY.md" -ForegroundColor Green
+if (-not (Test-Path "$WorkspaceRoot/docs/MEMORY.md")) {
+    New-Item -Path "$WorkspaceRoot/docs/MEMORY.md" -ItemType File -Force | Out-Null
+    Write-Host "  [OK] docs/MEMORY.md" -ForegroundColor Green
 }
 
 Write-Host "`n[2/5] Verifying 02_git_defender..." -ForegroundColor Cyan
-if (Test-Path "$ToolkitRoot/02_git_defender") {
+if (Test-Path "$WorkspaceRoot/src/02_git_defender") {
     Write-Host "[SUCCESS] 02_git_defender module verified." -ForegroundColor Green
-
-    if ((Test-Path "$ToolkitRoot/.gitignore") -and (-not (Test-Path "$WorkspaceRoot/.gitignore"))) {
-        Copy-Item -Path "$ToolkitRoot/.gitignore" -Destination "$WorkspaceRoot/.gitignore" -Force
-        Write-Host "[SUCCESS] .gitignore deployed." -ForegroundColor Green
-    }
 
     if (-not (Test-Path "$WorkspaceRoot/.git")) {
         Push-Location $WorkspaceRoot
@@ -152,17 +118,17 @@ if (Test-Path "$ToolkitRoot/02_git_defender") {
     }
 
     Push-Location $WorkspaceRoot
-    $hooksPath = "$ToolkitName/02_git_defender/githooks"
+    $hooksPath = "src/02_git_defender/githooks"
     git config core.hooksPath $hooksPath
     Pop-Location
     Write-Host "[SUCCESS] Git hooks bound to $hooksPath." -ForegroundColor Green
 }
 
 Write-Host "`n[3/5] Creating .env configuration..." -ForegroundColor Cyan
-$absBrowsersPath = "$ToolkitRoot/.playwright-browsers"
-$absPipCachePath = "$ToolkitRoot/.pip-cache"
+$absBrowsersPath = "$WorkspaceRoot/.playwright-browsers"
+$absPipCachePath = "$WorkspaceRoot/.pip-cache"
 if (-not (Test-Path "$WorkspaceRoot/.env")) {
-    $envExamplePath = "$ToolkitRoot/.env.example"
+    $envExamplePath = "$WorkspaceRoot/.env.example"
     if (Test-Path $envExamplePath) {
         Copy-Item -Path $envExamplePath -Destination "$WorkspaceRoot/.env" -Force
         Write-Host "[SUCCESS] .env created from template at $WorkspaceRoot\.env" -ForegroundColor Green
@@ -183,15 +149,7 @@ $venvPath = "$WorkspaceRoot/.venv"
 $requirementsPath = "$WorkspaceRoot/requirements.txt"
 
 $requirementsContent = @"
-browser-use>=0.1.0
-playwright>=1.40.0
-openai>=1.0.0
-pydantic>=2.0.0
 python-dotenv>=1.0.0
-pyyaml>=6.0
-beautifulsoup4>=4.12.0
-markdown>=3.5.0
-httpx>=0.25.0
 "@
 
 if (-not (Test-Path $requirementsPath)) {
@@ -213,7 +171,7 @@ $pythonExe = "$venvPath/Scripts/python.exe"
 Write-Host "[SUCCESS] Python dependencies configured." -ForegroundColor Green
 
 Write-Host "`n[5/5] Verifying Playwright browsers..." -ForegroundColor Cyan
-$browsersPath = "$ToolkitRoot/.playwright-browsers"
+$browsersPath = "$WorkspaceRoot/.playwright-browsers"
 $env:PLAYWRIGHT_BROWSERS_PATH = $browsersPath
 
 if (Test-Path "$browsersPath/chromium-1223") {

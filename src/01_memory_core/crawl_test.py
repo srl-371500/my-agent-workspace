@@ -7,8 +7,9 @@ from datetime import datetime
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from utils import fetch_html, extract_animations, summarize_animations, write_utf8
 
-TOOLKIT = Path(__file__).resolve().parent.parent
-REPORT_DIR = TOOLKIT.parent / "reports"
+TOOLKIT = Path(__file__).resolve().parent
+WS = TOOLKIT.parent.parent
+REPORT_DIR = WS / "reports"
 
 def html_to_text(html):
     text = re.sub(r"<script[^>]*>.*?</script>", "", html, flags=re.DOTALL | re.IGNORECASE)

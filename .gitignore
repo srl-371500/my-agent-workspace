@@ -58,3 +58,6 @@ browser_data/
 
 # D-Drive browser cache isolation
 .cache/
+
+# Old directory structure (legacy)
+ai外挂工程/

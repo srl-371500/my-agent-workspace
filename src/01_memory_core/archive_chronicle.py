@@ -6,12 +6,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from utils import read_utf8, write_utf8, load_env_config, call_llm
 THRESHOLD = 5
 WS = Path(__file__).resolve().parent.parent.parent
-SPEC = Path(__file__).resolve().parent / "SPEC.md"
+SPEC = WS / "docs" / "SPEC.md"
 
 def find_memory():
-    for p in [WS / "MEMORY.md", Path(__file__).resolve().parent / "MEMORY.md"]:
+    for p in [WS / "docs" / "MEMORY.md", WS / "MEMORY.md", Path(__file__).resolve().parent / "MEMORY.md"]:
         if p.exists() and re.search(r"^##\s+.*工作日志", read_utf8(p), re.MULTILINE): return p
-    return WS / "MEMORY.md"
+    return WS / "docs" / "MEMORY.md"
 
 def parse_log(content):
     entries, in_log, hdr, lines = [], False, None, []
